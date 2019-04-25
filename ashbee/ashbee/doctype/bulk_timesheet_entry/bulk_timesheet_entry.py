@@ -119,7 +119,7 @@ class BulkTimesheetEntry(Document):
 		else:
 			detail = timesheet.time_logs[0]
 		detail.parentfield = "time_logs"
-		detail.activity_type = entry_detail.activity_type
+		detail.activity_type = self.get_activity_type()
 		detail.hours = entry_detail.normal_hours
 		detail.from_time = entry_detail.start_date_time
 		detail.to_time = entry_detail.end_date_time
@@ -132,3 +132,14 @@ class BulkTimesheetEntry(Document):
 
 		timesheet_details.append(detail)
 		return timesheet_details
+
+	def get_activity_type(self):
+		name = "Labour Hours"
+		exists = frappe.db.exists("Activity Type", name)
+		if not exists:
+			labour_hours = frappe.new_doc("Activity Type")
+			labour_hours.activity_type = name
+			labour_hours.save(ignore_permissions=True)
+		else:
+			labour_hours = frappe.get_doc("Activity Type", name)
+		return labour_hours.name
