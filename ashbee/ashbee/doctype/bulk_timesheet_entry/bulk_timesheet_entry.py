@@ -37,11 +37,24 @@ class BulkTimesheetEntry(Document):
 		self.validate_costs()
 		self.update_timesheet()
 
+	def on_submit(self):
+		for detail in self.details:
+			self.submit_timesheet(detail.timesheet)
+
+	def on_cancel(self):
+		for detail in self.details:
+			self.cancel_timesheet(detail.timesheet)
+
+	def on_trash(self):
+		for detail in self.details:
+			self.delete_timesheet(detail.timesheet)
+
+
 	def validate_costs(self):
 		for detail in self.details:
 			detail.normal_cost = detail.hourly_cost * detail.normal_hours
-			detail.ot1 = detail.hourly_cost * detail.ot1_hours
-			detail.ot2 = detail.hourly_cost * detail.ot2_hours
+			detail.ot1 = detail.hourly_cost * detail.ot1_hours * 1.25
+			detail.ot2 = detail.hourly_cost * detail.ot2_hours * 1.50
 			detail.total_cost = detail.ot1 + detail.ot2 + detail.normal_cost
 
 
@@ -51,19 +64,40 @@ class BulkTimesheetEntry(Document):
 		timesheet_details = frappe.get_all("Bulk Timesheet Details",filters={"parent":self.name}, fields=["name","timesheet"])
 		for detail in timesheet_details:
 			if not self.details or detail.name not in [i.name for i in self.details]:
-				to_delete.append(detail.timesheet)
-		for d in to_delete:
-			self.delete_timesheet(d)
+				self.delete_timesheet(d)
 
-
+	def submit_timesheet(self, timesheet):
+		if not timesheet:
+			return
+		if isinstance(timesheet, str) or isinstance(timesheet, unicode):
+			timesheet = frappe.get_doc("Timesheet", timesheet)
+		if timesheet.docstatus == 0:
+			timesheet.submit()
 
 	def delete_timesheet(self, timesheet):
 		if not timesheet:
 			return
 		if isinstance(timesheet, str) or isinstance(timesheet, unicode):
+			if not self.timesheet_exists(timesheet):
+				return
 			timesheet = frappe.get_doc("Timesheet", timesheet)
-		timesheet.cancel()
+		if timesheet.docstatus == 1:
+			timesheet.cancel()
 		timesheet.delete()
+
+	def cancel_timesheet(self, timesheet):
+		if not timesheet:
+			return
+		if isinstance(timesheet, str) or isinstance(timesheet, unicode):
+			if not self.timesheet_exists(timesheet):
+				return
+			timesheet = frappe.get_doc("Timesheet", timesheet)
+		if timesheet.docstatus == 1:
+			timesheet.cancel()
+
+	def timesheet_exists(self, timesheet_name):
+		return frappe.db.exists("Timesheet",timesheet_name)
+
 
 
 
@@ -75,8 +109,8 @@ class BulkTimesheetEntry(Document):
 			timesheet.employee = detail.employee
 			timesheet.time_logs = self.get_timesheet_timelogs(timesheet, detail)
 			timesheet.save(ignore_permissions=True)
-			timesheet.submit()
 			detail.timesheet = timesheet.name
+			# detail.save()
 
 
 
@@ -86,8 +120,6 @@ class BulkTimesheetEntry(Document):
 			detail = frappe.new_doc("Timesheet Detail")
 		else:
 			detail = timesheet.time_logs[0]
-			
-
 		detail.parentfield = "time_logs"
 		detail.activity_type = entry_detail.activity_type
 		detail.hours = entry_detail.normal_hours
