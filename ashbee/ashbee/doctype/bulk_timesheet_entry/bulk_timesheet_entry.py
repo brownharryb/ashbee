@@ -8,6 +8,7 @@ from frappe.model.document import Document
 from frappe.utils import today
 from erpnext.hr.doctype.salary_structure_assignment.salary_structure_assignment import get_assigned_salary_structure
 
+
 class BulkTimesheetEntry(Document):
 	
 
@@ -33,17 +34,18 @@ class BulkTimesheetEntry(Document):
 		return salary_structure.hour_rate
 
 	def validate(self):
-		self.bulk_delete()
 		self.validate_costs()
-		self.update_timesheet()
-
-	def on_submit(self):
+		
+	def before_submit(self):
+		self.bulk_delete()
 		for detail in self.details:
+			self.update_timesheet(detail)
 			self.submit_timesheet(detail.timesheet)
 
 	def on_cancel(self):
 		for detail in self.details:
 			self.cancel_timesheet(detail.timesheet)
+			self.delete_timesheet(detail.timesheet)
 
 	def on_trash(self):
 		for detail in self.details:
@@ -99,19 +101,15 @@ class BulkTimesheetEntry(Document):
 		return frappe.db.exists("Timesheet",timesheet_name)
 
 
-
-
-	def update_timesheet(self):
-		for detail in self.details:
-			self.delete_timesheet(detail.timesheet)
-			timesheet = frappe.new_doc("Timesheet")
-			timesheet.company = self.company
-			timesheet.employee = detail.employee
-			timesheet.time_logs = self.get_timesheet_timelogs(timesheet, detail)
-			timesheet.save(ignore_permissions=True)
-			detail.timesheet = timesheet.name
-			# detail.save()
-
+	def update_timesheet(self, detail):
+		timesheet = frappe.new_doc("Timesheet")
+		timesheet.company = self.company
+		timesheet.employee = detail.employee
+		timesheet.time_logs = self.get_timesheet_timelogs(timesheet, detail)
+		timesheet.save(ignore_permissions=True)
+		detail.reload()
+		detail.timesheet = timesheet.name
+		detail.save()
 
 
 	def get_timesheet_timelogs(self, timesheet, entry_detail):
