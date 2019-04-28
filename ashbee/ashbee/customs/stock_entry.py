@@ -66,6 +66,8 @@ def create_variant_item(**filters):
 		variant.valuation_rate = (size * weight *0.250) + item.valuation_rate
 	if filters.get('valuation_rate'):
 		variant.valuation_rate = filters.get('valuation_rate')
+	variant.ashbee_bar = item.ashbee_bar
+	variant.ashbee_weight = item.ashbee_weight
 	variant.save();
 	return variant
 
